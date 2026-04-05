@@ -147,7 +147,7 @@ components:
           example: 86
         grade:
           type: string
-          example: B
+          example: A
 
     UserResponse:
       type: object
@@ -166,6 +166,10 @@ components:
           type: string
           enum: [HOD, LECTURER, RO]
           example: LECTURER
+        created_at:
+          type: string
+          format: date-time
+          example: 2026-04-01T10:00:00Z
 
     CreateUserRequest:
       type: object
@@ -222,6 +226,7 @@ components:
           properties:
             id:
               type: integer
+              example: 2
             name:
               type: string
               example: Prof. Chukwuemeka Obi
@@ -290,11 +295,9 @@ components:
           schema:
             $ref: '#/components/schemas/ValidationErrorResponse'
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
-
 paths:
 
-  # ── Auth ────────────────────────────────────────────────────────────────────
+  # ── Auth ─────────────────────────────────────────────────────────────────────
 
   /auth/login:
     post:
@@ -354,6 +357,7 @@ paths:
                 properties:
                   token:
                     type: string
+                    example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -361,6 +365,7 @@ paths:
     get:
       tags: [Auth]
       summary: Get current user
+      description: Return the authenticated user's profile.
       responses:
         '200':
           description: Authenticated user profile
@@ -371,7 +376,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  # ── Lecturer ─────────────────────────────────────────────────────────────────
+  # ── Lecturer + HOD (shared) ───────────────────────────────────────────────────
 
   /lecturers/{lecturerId}/courses:
     get:
@@ -398,6 +403,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /courses/{courseId}/students:
     get:
@@ -435,6 +442,7 @@ paths:
         Submit CA1, CA2, and Exam scores for students.
         Only the lecturer assigned to the course may upload.
         Re-upload is blocked once results are approved.
+        Accessible by LECTURER and HOD.
       parameters:
         - name: courseId
           in: path
@@ -466,7 +474,7 @@ paths:
                   exam: 48
       responses:
         '200':
-          description: Results uploaded
+          description: Results uploaded successfully
           content:
             application/json:
               schema:
@@ -474,7 +482,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Not assigned to this course or results already approved
+          description: Not assigned to this course, or results already approved
           content:
             application/json:
               schema:
@@ -482,10 +490,40 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
+    get:
+      tags: [Lecturer, HOD]
+      summary: View course results
+      description: |
+        Returns all student results including CA1, CA2, total CA, exam, total and grade.
+        Accessible by LECTURER and HOD.
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: List of results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Result'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /courses/{courseId}/results/download:
     get:
       tags: [Lecturer]
       summary: Download results as CSV
+      description: Streams a CSV file of all course results. Accessible by LECTURER and HOD.
       parameters:
         - name: courseId
           in: path
@@ -503,16 +541,18 @@ paths:
                 format: binary
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
-  # ── HOD ─────────────────────────────────────────────────────────────────────
+  # ── HOD only ──────────────────────────────────────────────────────────────────
 
   /hod/{departmentId}/courses/pending:
     get:
       tags: [HOD]
       summary: Get pending courses
-      description: Returns courses in the department with results awaiting approval.
+      description: Returns courses in the department with results awaiting approval. HOD only.
       parameters:
         - name: departmentId
           in: path
@@ -538,6 +578,7 @@ paths:
     get:
       tags: [HOD]
       summary: Get approved courses
+      description: Returns courses in the department with approved results. HOD only.
       parameters:
         - name: departmentId
           in: path
@@ -563,7 +604,7 @@ paths:
     post:
       tags: [HOD]
       summary: Approve results
-      description: Approve all pending results for a course.
+      description: Approve all pending results for a course. HOD only.
       parameters:
         - name: courseId
           in: path
@@ -573,7 +614,7 @@ paths:
           example: 1
       responses:
         '200':
-          description: Results approved
+          description: Results approved successfully
           content:
             application/json:
               schema:
@@ -589,7 +630,7 @@ paths:
     post:
       tags: [HOD]
       summary: Flag results
-      description: Flag issues in a course's results and send feedback to the lecturer.
+      description: Flag issues in a course's results and send feedback to the lecturer. HOD only.
       parameters:
         - name: courseId
           in: path
@@ -611,7 +652,7 @@ paths:
                   example: There are inconsistencies in the CA1 scores.
       responses:
         '200':
-          description: Issue flagged
+          description: Issue flagged successfully
           content:
             application/json:
               schema:
@@ -623,12 +664,13 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
-  # ── Registration Officer ─────────────────────────────────────────────────────
+  # ── Registration Officer ───────────────────────────────────────────────────────
 
   /ro/users:
     get:
       tags: [Registration Officer]
       summary: List all users
+      description: List system users, optionally filtered by role. RO only.
       parameters:
         - name: role
           in: query
@@ -653,6 +695,7 @@ paths:
     post:
       tags: [Registration Officer]
       summary: Create user
+      description: Create a new system user (Lecturer, HOD, or RO). RO only.
       requestBody:
         required: true
         content:
@@ -661,7 +704,7 @@ paths:
               $ref: '#/components/schemas/CreateUserRequest'
       responses:
         '201':
-          description: User created
+          description: User created successfully
           content:
             application/json:
               schema:
@@ -669,10 +712,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: User created successfully.
                   user:
                     $ref: '#/components/schemas/UserResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -680,12 +726,14 @@ paths:
     put:
       tags: [Registration Officer]
       summary: Update user
+      description: Update a system user's details. RO only.
       parameters:
         - name: userId
           in: path
           required: true
           schema:
             type: integer
+          example: 4
       requestBody:
         required: true
         content:
@@ -695,45 +743,57 @@ paths:
               properties:
                 name:
                   type: string
+                  example: Dr. Ada Okafor
                 email:
                   type: string
                   format: email
+                  example: ada.okafor@university.edu
                 password:
                   type: string
                   minLength: 8
+                  example: newpassword123
                 role:
                   type: string
                   enum: [HOD, LECTURER, RO]
+                  example: LECTURER
       responses:
         '200':
-          description: User updated
+          description: User updated successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
     delete:
       tags: [Registration Officer]
       summary: Delete user
+      description: Remove a system user. RO only.
       parameters:
         - name: userId
           in: path
           required: true
           schema:
             type: integer
+          example: 4
       responses:
         '200':
-          description: User deleted
+          description: User deleted successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -741,12 +801,14 @@ paths:
     get:
       tags: [Registration Officer]
       summary: List students
+      description: List all registered students, optionally filtered by department. RO only.
       parameters:
         - name: department_id
           in: query
           required: false
           schema:
             type: integer
+          example: 1
       responses:
         '200':
           description: List of students
@@ -758,10 +820,13 @@ paths:
                   $ref: '#/components/schemas/Student'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
     post:
       tags: [Registration Officer]
       summary: Register student
+      description: Register a new student. RO only.
       requestBody:
         required: true
         content:
@@ -770,7 +835,7 @@ paths:
               $ref: '#/components/schemas/CreateStudentRequest'
       responses:
         '201':
-          description: Student registered
+          description: Student registered successfully
           content:
             application/json:
               schema:
@@ -778,8 +843,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Student registered successfully.
                   student:
                     $ref: '#/components/schemas/Student'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -787,12 +857,14 @@ paths:
     put:
       tags: [Registration Officer]
       summary: Update student
+      description: Update a student's details. RO only.
       parameters:
         - name: studentId
           in: path
           required: true
           schema:
             type: integer
+          example: 1
       requestBody:
         required: true
         content:
@@ -802,39 +874,55 @@ paths:
               properties:
                 name:
                   type: string
+                  example: Jane Doe
                 matric:
                   type: string
+                  example: CSC/2024/099
                 email:
                   type: string
                   format: email
+                  example: jane.doe@student.edu
                 department_id:
                   type: integer
+                  example: 1
       responses:
         '200':
-          description: Student updated
+          description: Student updated successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
     delete:
       tags: [Registration Officer]
       summary: Delete student
+      description: Remove a student record. RO only.
       parameters:
         - name: studentId
           in: path
           required: true
           schema:
             type: integer
+          example: 1
       responses:
         '200':
-          description: Student deleted
+          description: Student deleted successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -842,12 +930,14 @@ paths:
     post:
       tags: [Registration Officer]
       summary: Enroll students in course
+      description: Enroll one or more students in a course. RO only.
       parameters:
         - name: courseId
           in: path
           required: true
           schema:
             type: integer
+          example: 1
       requestBody:
         required: true
         content:
@@ -863,11 +953,17 @@ paths:
                   example: [1, 2, 3]
       responses:
         '200':
-          description: Students enrolled
+          description: Students enrolled successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -875,24 +971,31 @@ paths:
     delete:
       tags: [Registration Officer]
       summary: Unenroll student from course
+      description: Remove a student from a course. RO only.
       parameters:
         - name: courseId
           in: path
           required: true
           schema:
             type: integer
+          example: 1
         - name: studentId
           in: path
           required: true
           schema:
             type: integer
+          example: 1
       responses:
         '200':
-          description: Student unenrolled
+          description: Student unenrolled successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -900,6 +1003,7 @@ paths:
     get:
       tags: [Registration Officer]
       summary: List departments
+      description: List all departments with their assigned HOD. RO only.
       responses:
         '200':
           description: List of departments
@@ -909,11 +1013,16 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Department'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /ro/courses:
     get:
       tags: [Registration Officer]
       summary: List all courses
+      description: List all courses with their lecturer and department. RO only.
       responses:
         '200':
           description: List of courses
@@ -923,3 +1032,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Course'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
