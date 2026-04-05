@@ -12,7 +12,8 @@ class Result extends Model
     protected $fillable = [
         'course_id',
         'student_id',
-        'ca',
+        'ca1',
+        'ca2',
         'exam',
         'total',
         'status',
@@ -20,10 +21,19 @@ class Result extends Model
     ];
 
     protected $casts = [
-        'ca'    => 'integer',
+        'ca1'   => 'integer',
+        'ca2'   => 'integer',
         'exam'  => 'integer',
         'total' => 'integer',
     ];
+
+    /**
+     * Combined CA score (ca1 + ca2), max 40.
+     */
+    public function getTotalCaAttribute(): int
+    {
+        return $this->ca1 + $this->ca2;
+    }
 
     // ── Relationships ─────────────────────────────────────────────────────
 

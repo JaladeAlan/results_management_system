@@ -1,0 +1,925 @@
+openapi: 3.0.3
+
+info:
+  title: Result Management System API
+  description: API for managing student results across Lecturers, HODs, and Registration Officer.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+          example: tunde.balogun@university.edu
+        password:
+          type: string
+          example: password
+        role:
+          type: string
+          enum: [HOD, LECTURER, RO]
+          example: LECTURER
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+        user:
+          $ref: '#/components/schemas/AuthUser'
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Dr. Tunde Balogun
+        role:
+          type: string
+          enum: [HOD, LECTURER, RO]
+          example: LECTURER
+
+    Course:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          example: CSC101
+        title:
+          type: string
+          example: Introduction to Computing
+        lecturer:
+          type: string
+          example: Dr. Tunde Balogun
+
+    CourseWithStatus:
+      allOf:
+        - $ref: '#/components/schemas/Course'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [pending, approved, flagged]
+              example: pending
+
+    Student:
+      type: object
+      properties:
+        studentId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Adaeze Okonkwo
+        matric:
+          type: string
+          example: CSC/2021/001
+
+    ScoreInput:
+      type: object
+      required: [matric, ca1, ca2, exam]
+      properties:
+        matric:
+          type: string
+          example: CSC/2021/001
+        ca1:
+          type: number
+          minimum: 0
+          maximum: 20
+          example: 18
+        ca2:
+          type: number
+          minimum: 0
+          maximum: 20
+          example: 16
+        exam:
+          type: number
+          minimum: 0
+          maximum: 60
+          example: 52
+
+    Result:
+      type: object
+      properties:
+        matric:
+          type: string
+          example: CSC/2021/001
+        name:
+          type: string
+          example: Adaeze Okonkwo
+        ca1:
+          type: integer
+          example: 18
+        ca2:
+          type: integer
+          example: 16
+        total_ca:
+          type: integer
+          example: 34
+        exam:
+          type: integer
+          example: 52
+        total:
+          type: integer
+          example: 86
+        grade:
+          type: string
+          example: B
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 4
+        name:
+          type: string
+          example: Dr. Tunde Balogun
+        email:
+          type: string
+          format: email
+          example: tunde.balogun@university.edu
+        role:
+          type: string
+          enum: [HOD, LECTURER, RO]
+          example: LECTURER
+
+    CreateUserRequest:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name:
+          type: string
+          example: Dr. Ada Okafor
+        email:
+          type: string
+          format: email
+          example: ada.okafor@university.edu
+        password:
+          type: string
+          minLength: 8
+          example: password123
+        role:
+          type: string
+          enum: [HOD, LECTURER, RO]
+          example: LECTURER
+
+    CreateStudentRequest:
+      type: object
+      required: [name, matric, department_id]
+      properties:
+        name:
+          type: string
+          example: Jane Doe
+        matric:
+          type: string
+          example: CSC/2024/099
+        email:
+          type: string
+          format: email
+          example: jane.doe@student.edu
+        department_id:
+          type: integer
+          example: 1
+
+    Department:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Computer Science
+        code:
+          type: string
+          example: CSC
+        hod:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+              example: Prof. Chukwuemeka Obi
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Operation successful.
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Invalid credentials.
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Validation failed.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            email: ["The email field is required."]
+
+  responses:
+    Unauthorized:
+      description: Token missing, expired or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: Token has expired.
+
+    Forbidden:
+      description: Authenticated but insufficient role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: Forbidden. Insufficient role.
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: Course not found.
+
+    UnprocessableEntity:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── Auth ────────────────────────────────────────────────────────────────────
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Authenticate a user and receive a JWT token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Invalidate the current JWT token.
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh token
+      description: Exchange an expiring token for a new one.
+      responses:
+        '200':
+          description: New token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      responses:
+        '200':
+          description: Authenticated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Lecturer ─────────────────────────────────────────────────────────────────
+
+  /lecturers/{lecturerId}/courses:
+    get:
+      tags: [Lecturer]
+      summary: Get lecturer courses
+      description: Returns all courses assigned to a lecturer. Accessible by LECTURER and HOD.
+      parameters:
+        - name: lecturerId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Course'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /courses/{courseId}/students:
+    get:
+      tags: [Lecturer]
+      summary: Get students for a course
+      description: Returns all students enrolled in the course. Accessible by LECTURER and HOD.
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Student'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /courses/{courseId}/results:
+    post:
+      tags: [Lecturer]
+      summary: Upload results
+      description: |
+        Submit CA1, CA2, and Exam scores for students.
+        Only the lecturer assigned to the course may upload.
+        Re-upload is blocked once results are approved.
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scores]
+              properties:
+                scores:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ScoreInput'
+            example:
+              scores:
+                - matric: CSC/2021/001
+                  ca1: 18
+                  ca2: 16
+                  exam: 52
+                - matric: CSC/2021/002
+                  ca1: 15
+                  ca2: 14
+                  exam: 48
+      responses:
+        '200':
+          description: Results uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not assigned to this course or results already approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /courses/{courseId}/results/download:
+    get:
+      tags: [Lecturer]
+      summary: Download results as CSV
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: CSV file stream
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── HOD ─────────────────────────────────────────────────────────────────────
+
+  /hod/{departmentId}/courses/pending:
+    get:
+      tags: [HOD]
+      summary: Get pending courses
+      description: Returns courses in the department with results awaiting approval.
+      parameters:
+        - name: departmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: List of pending courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseWithStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /hod/{departmentId}/courses/approved:
+    get:
+      tags: [HOD]
+      summary: Get approved courses
+      parameters:
+        - name: departmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: List of approved courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseWithStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /courses/{courseId}/results/approve:
+    post:
+      tags: [HOD]
+      summary: Approve results
+      description: Approve all pending results for a course.
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Results approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /courses/{courseId}/results/flag:
+    post:
+      tags: [HOD]
+      summary: Flag results
+      description: Flag issues in a course's results and send feedback to the lecturer.
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description:
+                  type: string
+                  minLength: 5
+                  example: There are inconsistencies in the CA1 scores.
+      responses:
+        '200':
+          description: Issue flagged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ── Registration Officer ─────────────────────────────────────────────────────
+
+  /ro/users:
+    get:
+      tags: [Registration Officer]
+      summary: List all users
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [HOD, LECTURER, RO]
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Registration Officer]
+      summary: Create user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /ro/users/{userId}:
+    put:
+      tags: [Registration Officer]
+      summary: Update user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                role:
+                  type: string
+                  enum: [HOD, LECTURER, RO]
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Registration Officer]
+      summary: Delete user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ro/students:
+    get:
+      tags: [Registration Officer]
+      summary: List students
+      parameters:
+        - name: department_id
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Student'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Registration Officer]
+      summary: Register student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStudentRequest'
+      responses:
+        '201':
+          description: Student registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  student:
+                    $ref: '#/components/schemas/Student'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /ro/students/{studentId}:
+    put:
+      tags: [Registration Officer]
+      summary: Update student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                matric:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                department_id:
+                  type: integer
+      responses:
+        '200':
+          description: Student updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Registration Officer]
+      summary: Delete student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Student deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ro/courses/{courseId}/enroll:
+    post:
+      tags: [Registration Officer]
+      summary: Enroll students in course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_ids]
+              properties:
+                student_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2, 3]
+      responses:
+        '200':
+          description: Students enrolled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /ro/courses/{courseId}/enroll/{studentId}:
+    delete:
+      tags: [Registration Officer]
+      summary: Unenroll student from course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Student unenrolled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ro/departments:
+    get:
+      tags: [Registration Officer]
+      summary: List departments
+      responses:
+        '200':
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+
+  /ro/courses:
+    get:
+      tags: [Registration Officer]
+      summary: List all courses
+      responses:
+        '200':
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Course'
