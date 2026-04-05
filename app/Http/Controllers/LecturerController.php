@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Result;
 use App\Models\Student;
 use Illuminate\Http\Request;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class LecturerController extends Controller
 {
@@ -50,28 +51,48 @@ class LecturerController extends Controller
 
     /**
      * POST /api/courses/{courseId}/results
-     * Submit CA and Exam scores for students in a course.
+     * Submit CA1, CA2 and Exam scores.
+     * ca1 + ca2 = max 40, exam = max 60, total = max 100
      */
     public function uploadResults(Request $request, $courseId)
     {
-        Course::findOrFail($courseId);
+        $course = Course::findOrFail($courseId);
+
+        if ($course->lecturer_id !== JWTAuth::parseToken()->authenticate()->id) {
+            return response()->json(['message' => 'You are not assigned to this course.'], 403);
+        }
+
+        // Check if results already exist and have been approved — block re-upload
+        $approvedExists = Result::where('course_id', $courseId)
+            ->where('status', 'approved')
+            ->exists();
+
+        if ($approvedExists) {
+            return response()->json(['message' => 'Results for this course have already been approved and cannot be re-uploaded.'], 422);
+        }
 
         $request->validate([
-            'scores'          => 'required|array|min:1',
-            'scores.*.matric' => 'required|string|exists:students,matric',
-            'scores.*.ca'     => 'required|numeric|min:0|max:30',
-            'scores.*.exam'   => 'required|numeric|min:0|max:70',
+            'scores'           => 'required|array|min:1',
+            'scores.*.matric'  => 'required|string|exists:students,matric',
+            'scores.*.ca1'     => 'required|numeric|min:0|max:20',
+            'scores.*.ca2'     => 'required|numeric|min:0|max:20',
+            'scores.*.exam'    => 'required|numeric|min:0|max:60',
         ]);
 
         foreach ($request->scores as $score) {
             $student = Student::where('matric', $score['matric'])->first();
 
+            $ca1   = $score['ca1'];
+            $ca2   = $score['ca2'];
+            $exam  = $score['exam'];
+
             Result::updateOrCreate(
                 ['course_id' => $courseId, 'student_id' => $student->id],
                 [
-                    'ca'     => $score['ca'],
-                    'exam'   => $score['exam'],
-                    'total'  => $score['ca'] + $score['exam'],
+                    'ca1'    => $ca1,
+                    'ca2'    => $ca2,
+                    'exam'   => $exam,
+                    'total'  => $ca1 + $ca2 + $exam,
                     'status' => 'pending',
                 ]
             );
@@ -99,14 +120,17 @@ class LecturerController extends Controller
 
         $callback = function () use ($results) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Matric', 'Name', 'CA', 'Exam', 'Total', 'Status']);
+            fputcsv($handle, ['Matric', 'Name', 'CA1', 'CA2', 'Total CA', 'Exam', 'Total', 'Grade', 'Status']);
             foreach ($results as $result) {
                 fputcsv($handle, [
                     $result->student->matric,
                     $result->student->name,
-                    $result->ca,
+                    $result->ca1,
+                    $result->ca2,
+                    $result->total_ca,
                     $result->exam,
                     $result->total,
+                    $result->grade,
                     $result->status,
                 ]);
             }

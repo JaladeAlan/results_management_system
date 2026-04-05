@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
@@ -60,11 +60,14 @@ class HodController extends Controller
             ->with('student:id,name,matric')
             ->get()
             ->map(fn($result) => [
-                'matric' => $result->student->matric,
-                'name'   => $result->student->name,
-                'ca'     => $result->ca,
-                'exam'   => $result->exam,
-                'total'  => $result->total,
+                'matric'   => $result->student->matric,
+                'name'     => $result->student->name,
+                'ca1'      => $result->ca1,
+                'ca2'      => $result->ca2,
+                'total_ca' => $result->total_ca,
+                'exam'     => $result->exam,
+                'total'    => $result->total,
+                'grade'    => $result->grade,
             ]);
 
         return response()->json($results);

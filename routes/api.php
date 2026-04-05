@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\HodController;
-use App\Http\Controllers\Api\LecturerController;
-use App\Http\Controllers\Api\RegistrationOfficerController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\HodController;
+use App\Http\Controllers\LecturerController;
+use App\Http\Controllers\RegistrationOfficerController;
 use Illuminate\Support\Facades\Route;
 
 /*
