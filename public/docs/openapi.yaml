@@ -6,7 +6,7 @@ info:
   version: 1.0.0
 
 servers:
-  - url:https://resultsmanagementsystem.up.railway.app/api
+  - url: https://resultsmanagementsystem.up.railway.app/api
     description: Live development
 
 security:
