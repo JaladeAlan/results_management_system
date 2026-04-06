@@ -6,8 +6,8 @@ info:
   version: 1.0.0
 
 servers:
-  - url: http://localhost:8000/api
-    description: Local development
+  - url:https://resultsmanagementsystem.up.railway.app/api
+    description: Live development
 
 security:
   - bearerAuth: []
