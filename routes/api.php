@@ -4,8 +4,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HodController;
 use App\Http\Controllers\LecturerController;
 use App\Http\Controllers\RegistrationOfficerController;
-use App\Http\Controllers\Api\DepartmentController;
-use App\Http\Controllers\Api\CourseController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\CourseController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ───────────────────────────────────────────────────────────────────
