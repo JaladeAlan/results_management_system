@@ -1036,3 +1036,668 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  # ── Departments (shared - all authenticated) ──────────────────────────────
+
+  /departments:
+    get:
+      tags: [Departments]
+      summary: List all departments
+      description: Returns all departments with HOD info, course count, and student count.
+      responses:
+        '200':
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Department'
+                    - type: object
+                      properties:
+                        courses_count:
+                          type: integer
+                          example: 5
+                        students_count:
+                          type: integer
+                          example: 120
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /departments/{department}:
+    get:
+      tags: [Departments]
+      summary: Get a department
+      description: Returns a single department with HOD info, course count, and student count.
+      parameters:
+        - name: department
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Department detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Department'
+                  - type: object
+                    properties:
+                      courses_count:
+                        type: integer
+                        example: 5
+                      students_count:
+                        type: integer
+                        example: 120
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /departments/{department}/courses:
+    get:
+      tags: [Departments]
+      summary: Get department courses
+      description: Returns all courses in a department with lecturer name and student count.
+      parameters:
+        - name: department
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    code:
+                      type: string
+                      example: CSC101
+                    title:
+                      type: string
+                      example: Introduction to Computing
+                    lecturer:
+                      type: string
+                      nullable: true
+                      example: Dr. Tunde Balogun
+                    students_count:
+                      type: integer
+                      example: 45
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /departments/{department}/students:
+    get:
+      tags: [Departments]
+      summary: Get department students
+      description: Returns all students belonging to a department.
+      parameters:
+        - name: department
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Student'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /departments/{department}/lecturers:
+    get:
+      tags: [Departments]
+      summary: Get department lecturers
+      description: Returns all lecturers who teach at least one course in the department.
+      parameters:
+        - name: department
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: List of lecturers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 3
+                    name:
+                      type: string
+                      example: Dr. Tunde Balogun
+                    email:
+                      type: string
+                      format: email
+                      example: tunde.balogun@university.edu
+                    courses_count:
+                      type: integer
+                      example: 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /departments/{department}/results/summary:
+    get:
+      tags: [Departments]
+      summary: Get department results summary
+      description: HOD dashboard — per-course pass/fail counts, averages, and status breakdown.
+      parameters:
+        - name: department
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Results summary per course
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    course_id:
+                      type: integer
+                      example: 1
+                    course_code:
+                      type: string
+                      example: CSC101
+                    course_title:
+                      type: string
+                      example: Introduction to Computing
+                    total_students:
+                      type: integer
+                      example: 45
+                    passed:
+                      type: integer
+                      example: 38
+                    failed:
+                      type: integer
+                      example: 7
+                    pass_rate:
+                      type: number
+                      format: float
+                      example: 84.4
+                    average:
+                      type: number
+                      format: float
+                      example: 67.5
+                    status_breakdown:
+                      type: object
+                      properties:
+                        pending:
+                          type: integer
+                          example: 0
+                        approved:
+                          type: integer
+                          example: 45
+                        flagged:
+                          type: integer
+                          example: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Departments (RO only) ─────────────────────────────────────────────────
+
+  /ro/departments/{department}:
+    put:
+      tags: [Registration Officer]
+      summary: Update department
+      description: Update a department's name, code, or HOD assignment. RO only.
+      parameters:
+        - name: department
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Computer Science
+                code:
+                  type: string
+                  example: CSC
+                hod_id:
+                  type: integer
+                  nullable: true
+                  example: 2
+      responses:
+        '200':
+          description: Department updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Registration Officer]
+      summary: Delete department
+      description: Delete a department. Blocked if it still has courses assigned. RO only.
+      parameters:
+        - name: department
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Department deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Department still has courses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /ro/departments/create:
+    post:
+      tags: [Registration Officer]
+      summary: Create department
+      description: Create a new department, optionally assigning an HOD. RO only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code]
+              properties:
+                name:
+                  type: string
+                  maxLength: 150
+                  example: Computer Science
+                code:
+                  type: string
+                  maxLength: 10
+                  example: CSC
+                hod_id:
+                  type: integer
+                  nullable: true
+                  example: 2
+      responses:
+        '201':
+          description: Department created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Department created successfully.
+                  department:
+                    $ref: '#/components/schemas/Department'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /ro/departments/{department}/assign-hod:
+    patch:
+      tags: [Registration Officer]
+      summary: Assign HOD to department
+      description: |
+        Assigns a user with the HOD role as head of the department.
+        Automatically unassigns them from any other department they currently lead.
+        RO only.
+      parameters:
+        - name: department
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hod_id]
+              properties:
+                hod_id:
+                  type: integer
+                  example: 2
+      responses:
+        '200':
+          description: HOD assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Prof. Chukwuemeka Obi has been assigned as HOD of Computer Science.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: User does not have the HOD role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Courses (shared - LECTURER + HOD) ────────────────────────────────────
+
+  /courses:
+    get:
+      tags: [Courses]
+      summary: List all courses
+      description: |
+        Returns all courses with lecturer and department info.
+        Supports optional filtering by `department_id` or `lecturer_id`.
+        Accessible by LECTURER and HOD.
+      parameters:
+        - name: department_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          example: 1
+        - name: lecturer_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          example: 3
+      responses:
+        '200':
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    code:
+                      type: string
+                      example: CSC101
+                    title:
+                      type: string
+                      example: Introduction to Computing
+                    lecturer:
+                      type: string
+                      nullable: true
+                      example: Dr. Tunde Balogun
+                    lecturer_id:
+                      type: integer
+                      nullable: true
+                      example: 3
+                    department:
+                      type: string
+                      nullable: true
+                      example: Computer Science
+                    department_id:
+                      type: integer
+                      nullable: true
+                      example: 1
+                    students_count:
+                      type: integer
+                      example: 45
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /courses/{course}:
+    get:
+      tags: [Courses]
+      summary: Get a course
+      description: Returns a single course with lecturer, department, and student count. Accessible by LECTURER and HOD.
+      parameters:
+        - name: course
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Course detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 1
+                  code:
+                    type: string
+                    example: CSC101
+                  title:
+                    type: string
+                    example: Introduction to Computing
+                  lecturer:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 3
+                      name:
+                        type: string
+                        example: Dr. Tunde Balogun
+                      email:
+                        type: string
+                        example: tunde.balogun@university.edu
+                  department:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      name:
+                        type: string
+                        example: Computer Science
+                      code:
+                        type: string
+                        example: CSC
+                  students_count:
+                    type: integer
+                    example: 45
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Courses (RO only) ────────────────────────────────────────────────────
+
+  /ro/courses/{course}:
+    put:
+      tags: [Registration Officer]
+      summary: Update course
+      description: Update a course's code, title, lecturer, or department. RO only.
+      parameters:
+        - name: course
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  maxLength: 20
+                  example: CSC101
+                title:
+                  type: string
+                  maxLength: 200
+                  example: Introduction to Computing
+                lecturer_id:
+                  type: integer
+                  example: 3
+                department_id:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Course updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Registration Officer]
+      summary: Delete course
+      description: Delete a course. Blocked if it has any approved results. RO only.
+      parameters:
+        - name: course
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Course deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Course has approved results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /ro/courses/{course}/assign-lecturer:
+    patch:
+      tags: [Registration Officer]
+      summary: Assign lecturer to course
+      description: Assigns a user with the LECTURER role to a course. RO only.
+      parameters:
+        - name: course
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lecturer_id]
+              properties:
+                lecturer_id:
+                  type: integer
+                  example: 3
+      responses:
+        '200':
+          description: Lecturer assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Dr. Tunde Balogun has been assigned to CSC101.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: User does not have the LECTURER role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
