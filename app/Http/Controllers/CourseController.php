@@ -65,8 +65,8 @@ class CourseController extends Controller
         ]);
 
         $lecturer = User::findOrFail($request->lecturer_id);
-        if ($lecturer->role !== 'LECTURER') {
-            return response()->json(['message' => 'Assigned user must have the LECTURER role.'], 422);
+        if ($lecturer->role !== 'LECTURER' && $lecturer->role !== 'HOD') {
+            return response()->json(['message' => 'Assigned user must have the LECTURER or HOD role.'], 422);
         }
 
         // Ensure lecturer belongs to the same department
@@ -95,8 +95,8 @@ class CourseController extends Controller
 
         if ($request->filled('lecturer_id')) {
             $lecturer = User::findOrFail($request->lecturer_id);
-            if ($lecturer->role !== 'LECTURER') {
-                return response()->json(['message' => 'Assigned user must have the LECTURER role.'], 422);
+            if ($lecturer->role !== 'LECTURER' && $lecturer->role !== 'HOD') {
+                return response()->json(['message' => 'Assigned user must have the LECTURER or HOD role.'], 422);
             }
         }
 
@@ -134,8 +134,8 @@ class CourseController extends Controller
 
         $lecturer = User::findOrFail($request->lecturer_id);
 
-        if ($lecturer->role !== 'LECTURER') {
-            return response()->json(['message' => 'User must have the LECTURER role.'], 422);
+        if ($lecturer->role !== 'LECTURER' && $lecturer->role !== 'HOD') {
+            return response()->json(['message' => 'User must have the LECTURER or HOD role.'], 422);
         }
 
         $course->update(['lecturer_id' => $lecturer->id]);
