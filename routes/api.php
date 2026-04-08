@@ -24,7 +24,7 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('/departments/{department}/courses',         [DepartmentController::class, 'courses']);
     Route::get('/departments/{department}/students',        [DepartmentController::class, 'students']);
     Route::get('/departments/{department}/lecturers',       [DepartmentController::class, 'lecturers']);
-    Route::get('/departments/{department}/results/summary', [DepartmentController::class, 'resultsSummary']);
+    // Route::get('/departments/{department}/results/summary', [DepartmentController::class, 'resultsSummary']);
 
     // ── Shared: Lecturer + HOD ────────────────────────────────────────────────
     Route::middleware('role:LECTURER,HOD')->group(function () {

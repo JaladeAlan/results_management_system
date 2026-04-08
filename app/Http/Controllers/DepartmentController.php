@@ -168,49 +168,49 @@ class DepartmentController extends Controller
         return response()->json($lecturers);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // RESULTS SUMMARY  —  GET /api/departments/{department}/results/summary
-    // HOD dashboard — pass/fail counts, average total per course
-    // ═══════════════════════════════════════════════════════════════════════════
+    // // ═══════════════════════════════════════════════════════════════════════════
+    // // RESULTS SUMMARY  —  GET /api/departments/{department}/results/summary
+    // // HOD dashboard — pass/fail counts, average total per course
+    // // ═══════════════════════════════════════════════════════════════════════════
 
-    public function resultsSummary(Department $department)
-    {
-        $courseIds = Course::where('department_id', $department->id)->pluck('id');
+    // public function resultsSummary(Department $department)
+    // {
+    //     $courseIds = Course::where('department_id', $department->id)->pluck('id');
 
-        $summary = Result::whereIn('course_id', $courseIds)
-            ->with('course:id,code,title')
-            ->selectRaw('
-                course_id,
-                COUNT(*)                                    as total_students,
-                SUM(CASE WHEN total >= 40 THEN 1 ELSE 0 END) as passed,
-                SUM(CASE WHEN total <  40 THEN 1 ELSE 0 END) as failed,
-                ROUND(AVG(total), 2)                         as average,
-                SUM(CASE WHEN status = "pending"  THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved,
-                SUM(CASE WHEN status = "flagged"  THEN 1 ELSE 0 END) as flagged
-            ')
-            ->groupBy('course_id')
-            ->get()
-            ->map(fn($r) => [
-                'course_id'      => $r->course_id,
-                'course_code'    => $r->course?->code,
-                'course_title'   => $r->course?->title,
-                'total_students' => $r->total_students,
-                'passed'         => $r->passed,
-                'failed'         => $r->failed,
-                'pass_rate'      => $r->total_students > 0
-                    ? round(($r->passed / $r->total_students) * 100, 1)
-                    : 0,
-                'average'        => $r->average,
-                'status_breakdown' => [
-                    'pending'  => $r->pending,
-                    'approved' => $r->approved,
-                    'flagged'  => $r->flagged,
-                ],
-            ]);
+    //     $summary = Result::whereIn('course_id', $courseIds)
+    //         ->with('course:id,code,title')
+    //         ->selectRaw('
+    //             course_id,
+    //             COUNT(*)                                    as total_students,
+    //             SUM(CASE WHEN total >= 40 THEN 1 ELSE 0 END) as passed,
+    //             SUM(CASE WHEN total <  40 THEN 1 ELSE 0 END) as failed,
+    //             ROUND(AVG(total), 2)                         as average,
+    //             SUM(CASE WHEN status = "pending"  THEN 1 ELSE 0 END) as pending,
+    //             SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved,
+    //             SUM(CASE WHEN status = "flagged"  THEN 1 ELSE 0 END) as flagged
+    //         ')
+    //         ->groupBy('course_id')
+    //         ->get()
+    //         ->map(fn($r) => [
+    //             'course_id'      => $r->course_id,
+    //             'course_code'    => $r->course?->code,
+    //             'course_title'   => $r->course?->title,
+    //             'total_students' => $r->total_students,
+    //             'passed'         => $r->passed,
+    //             'failed'         => $r->failed,
+    //             'pass_rate'      => $r->total_students > 0
+    //                 ? round(($r->passed / $r->total_students) * 100, 1)
+    //                 : 0,
+    //             'average'        => $r->average,
+    //             'status_breakdown' => [
+    //                 'pending'  => $r->pending,
+    //                 'approved' => $r->approved,
+    //                 'flagged'  => $r->flagged,
+    //             ],
+    //         ]);
 
-        return response()->json($summary);
-    }
+    //     return response()->json($summary);
+    // }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ASSIGN HOD  —  PATCH /api/departments/{department}/assign-hod  [RO only]
