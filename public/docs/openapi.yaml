@@ -231,6 +231,25 @@ components:
               type: string
               example: Prof. Chukwuemeka Obi
 
+    CsvValidationErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: CSV validation failed. Fix the errors and re-upload.
+        errors:
+          type: object
+          description: Keys are "Row N (matric)" labels; values are arrays of error strings.
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            "Row 4 (CSC/2021/003)":
+              - "ca1 must be a number between 0 and 20 (got: \"25\")"
+            "Row 7 (CSC/2021/006)":
+              - "exam must be a number between 0 and 60 (got: \"\")"
+
     MessageResponse:
       type: object
       properties:
@@ -376,7 +395,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  # ── Lecturer + HOD (shared) ───────────────────────────────────────────────────
+  # ── Lecturer ──────────────────────────────────────────────────────────────────
 
   /lecturers/{lecturerId}/courses:
     get:
@@ -434,14 +453,88 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /courses/{courseId}/results/template:
+    get:
+      tags: [Lecturer]
+      summary: Download results template (CSV)
+      description: |
+        Downloads a blank CSV pre-filled with every student enrolled in the course.
+        The lecturer fills in `ca1`, `ca2`, and `exam` columns, then re-uploads the
+        file via `POST /courses/{courseId}/results` as `multipart/form-data`.
+
+        The file includes two comment rows (prefixed with `#`) for context — these
+        are ignored during re-upload. The data begins at the `matric,name,ca1,ca2,exam`
+        header row.
+
+        **Example output:**
+        ```
+        # Course,CSC101,Introduction to Computing
+        # Scoring,CA1 max: 20,CA2 max: 20,Exam max: 60
+
+        matric,name,ca1,ca2,exam
+        CSC/2021/001,Adaeze Okonkwo,,,
+        CSC/2021/002,Babatunde Lawal,,,
+        ```
+
+        Accessible by LECTURER and HOD.
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: CSV template file stream
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: 'attachment; filename="results_template_CSC101.csv"'
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /courses/{courseId}/results:
     post:
       tags: [Lecturer]
-      summary: Upload results
+      summary: Upload results (JSON or CSV)
       description: |
-        Submit CA1, CA2, and Exam scores for students.
-        Only the lecturer assigned to the course may upload.
-        Re-upload is blocked once results are approved.
+        Submit CA1, CA2, and Exam scores for all students in a course.
+
+        **Two accepted formats:**
+
+        ### 1 — JSON body
+        Send `Content-Type: application/json` with a `scores` array.
+
+        ### 2 — CSV file upload
+        Send `Content-Type: multipart/form-data` with a single `file` field
+        containing the filled-in template downloaded from
+        `GET /courses/{courseId}/results/template`.
+
+        Required CSV columns (order-independent, case-insensitive):
+        `matric`, `ca1`, `ca2`, `exam` — the `name` column is optional and ignored.
+        Comment rows (`# ...`) and blank rows are skipped automatically.
+
+        **Validation (both formats):**
+        - `ca1`: 0 – 20
+        - `ca2`: 0 – 20
+        - `exam`: 0 – 60
+        - `matric` must exist in the `students` table
+
+        **Restrictions:**
+        - Only the lecturer assigned to the course may upload.
+        - Re-upload is blocked once any result for the course is `approved`.
+
         Accessible by LECTURER and HOD.
       parameters:
         - name: courseId
@@ -472,6 +565,20 @@ paths:
                   ca1: 15
                   ca2: 14
                   exam: 48
+          multipart/form-data:
+            schema:
+              type: object
+              required: [scores]
+              properties:
+                scores:
+                  type: string
+                  format: binary
+                  description: >
+                    Filled-in CSV template. Accepted MIME types: text/csv, text/plain.
+                    Maximum size: 2 MB.
+            encoding:
+              scores:
+                contentType: text/csv, text/plain
       responses:
         '200':
           description: Results uploaded successfully
@@ -479,6 +586,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Results uploaded successfully.
+        '207':
+          description: |
+            Partial success — all valid rows were saved but one or more matric numbers
+            were not found in the database and were skipped.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Some rows had errors and were skipped.
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "Row 3 (CSC/2021/099): matric 'CSC/2021/099' not found."
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -487,8 +614,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAssigned:
+                  summary: Lecturer not assigned
+                  value:
+                    message: You are not assigned to this course.
+                alreadyApproved:
+                  summary: Results already approved
+                  value:
+                    message: Results for this course have already been approved and cannot be re-uploaded.
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: |
+            Validation failed. Returned for:
+            - Missing/invalid fields in JSON body
+            - Missing required CSV columns
+            - Per-row range or format errors in CSV
+            - Empty CSV file
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/CsvValidationErrorResponse'
+              examples:
+                jsonValidation:
+                  summary: JSON body validation failure
+                  value:
+                    message: Validation failed.
+                    errors:
+                      scores.0.ca1: ["The scores.0.ca1 field must not be greater than 20."]
+                csvMissingColumn:
+                  summary: CSV missing a required column
+                  value:
+                    message: 'CSV is missing required column: "exam". Expected header row: matric, name, ca1, ca2, exam'
+                csvRowErrors:
+                  summary: CSV per-row validation errors
+                  value:
+                    message: CSV validation failed. Fix the errors and re-upload.
+                    errors:
+                      "Row 4 (CSC/2021/003)":
+                        - "ca1 must be a number between 0 and 20 (got: \"25\")"
+                      "Row 7 (CSC/2021/006)":
+                        - "exam must be a number between 0 and 60 (got: \"\")"
 
     get:
       tags: [Lecturer, HOD]
@@ -522,8 +689,10 @@ paths:
   /courses/{courseId}/results/download:
     get:
       tags: [Lecturer]
-      summary: Download results as CSV
-      description: Streams a CSV file of all course results. Accessible by LECTURER and HOD.
+      summary: Download submitted results (CSV)
+      description: |
+        Streams a CSV of all submitted results for the course, including grades and
+        approval status. Accessible by LECTURER and HOD.
       parameters:
         - name: courseId
           in: path
@@ -534,6 +703,11 @@ paths:
       responses:
         '200':
           description: CSV file stream
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: 'attachment; filename="results_CSC101.csv"'
           content:
             text/csv:
               schema:
@@ -1036,7 +1210,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-  # ── Departments (shared - all authenticated) ──────────────────────────────
+
+  # ── Departments (shared - all authenticated) ──────────────────────────────────
 
   /departments:
     get:
@@ -1206,74 +1381,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  # /departments/{department}/results/summary:
-  #   get:
-  #     tags: [Departments]
-  #     summary: Get department results summary
-  #     description: HOD dashboard — per-course pass/fail counts, averages, and status breakdown.
-  #     parameters:
-  #       - name: department
-  #         in: path
-  #         required: true
-  #         schema:
-  #           type: integer
-  #         example: 1
-  #     responses:
-  #       '200':
-  #         description: Results summary per course
-  #         content:
-  #           application/json:
-  #             schema:
-  #               type: array
-  #               items:
-  #                 type: object
-  #                 properties:
-  #                   course_id:
-  #                     type: integer
-  #                     example: 1
-  #                   course_code:
-  #                     type: string
-  #                     example: CSC101
-  #                   course_title:
-  #                     type: string
-  #                     example: Introduction to Computing
-  #                   total_students:
-  #                     type: integer
-  #                     example: 45
-  #                   passed:
-  #                     type: integer
-  #                     example: 38
-  #                   failed:
-  #                     type: integer
-  #                     example: 7
-  #                   pass_rate:
-  #                     type: number
-  #                     format: float
-  #                     example: 84.4
-  #                   average:
-  #                     type: number
-  #                     format: float
-  #                     example: 67.5
-  #                   status_breakdown:
-  #                     type: object
-  #                     properties:
-  #                       pending:
-  #                         type: integer
-  #                         example: 0
-  #                       approved:
-  #                         type: integer
-  #                         example: 45
-  #                       flagged:
-  #                         type: integer
-  #                         example: 0
-  #       '401':
-  #         $ref: '#/components/responses/Unauthorized'
-  #       '403':
-  #         $ref: '#/components/responses/Forbidden'
-  #       '404':
-  #         $ref: '#/components/responses/NotFound'
-
-  # ── Departments (RO only) ─────────────────────────────────────────────────
+  # ── Departments (RO only) ─────────────────────────────────────────────────────
 
   /ro/departments/{department}:
     put:
@@ -1444,7 +1552,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  # ── Courses (shared - LECTURER + HOD) ────────────────────────────────────
+  # ── Courses (shared - LECTURER + HOD) ────────────────────────────────────────
 
   /courses:
     get:
@@ -1575,7 +1683,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  # ── Courses (RO only) ────────────────────────────────────────────────────
+  # ── Courses (RO only) ─────────────────────────────────────────────────────────
 
   /ro/courses/{course}:
     put:
